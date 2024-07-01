@@ -4,7 +4,7 @@
 const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
 #[starknet::contract]
-mod MyToken {
+mod NFTWarpedToken {
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;

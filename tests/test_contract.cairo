@@ -1,11 +1,13 @@
-use starknet::ContractAddress;
+use core::result::ResultTrait;
+use starknet::{ContractAddress, contract_address_const, get_caller_address, get_block_number};
+use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
 
 use snforge_std::{declare, ContractClassTrait};
 
-use nftwarper::HelloStarknet::IHelloStarknetSafeDispatcher;
-use nftwarper::HelloStarknet::IHelloStarknetSafeDispatcherTrait;
-use nftwarper::HelloStarknet::IHelloStarknetDispatcher;
-use nftwarper::HelloStarknet::IHelloStarknetDispatcherTrait;
+use nftwarper::NFTWarper::INFTWarperSafeDispatcher;
+use nftwarper::NFTWarper::INFTWarperSafeDispatcherTrait;
+use nftwarper::NFTWarper::INFTWarperDispatcher;
+use nftwarper::NFTWarper::INFTWarperDispatcherTrait;
 
 fn deploy_contract(name: ByteArray) -> ContractAddress {
     let contract = declare(name).unwrap();
@@ -13,35 +15,23 @@ fn deploy_contract(name: ByteArray) -> ContractAddress {
     contract_address
 }
 
-#[test]
-fn test_increase_balance() {
-    let contract_address = deploy_contract("HelloStarknet");
+fn deploy_warper_contract(default_admin: ContractAddress) -> ContractAddress {
+    let contract = declare("NFTWarper").unwrap();
+    let args: Array<felt252> = array![
+        default_admin.into()
+    ];
+    let (contract_address, _) = contract.deploy(@args).unwrap();
+    contract_address
 
-    let dispatcher = IHelloStarknetDispatcher { contract_address };
-
-    let balance_before = dispatcher.get_balance();
-    assert(balance_before == 0, 'Invalid balance');
-
-    dispatcher.increase_balance(42);
-
-    let balance_after = dispatcher.get_balance();
-    assert(balance_after == 42, 'Invalid balance');
 }
 
 #[test]
-#[feature("safe_dispatcher")]
-fn test_cannot_increase_balance_with_zero_value() {
-    let contract_address = deploy_contract("HelloStarknet");
+fn test_get_default_admin() {
+    let contract_address = deploy_warper_contract(contract_address_const::<1>());
 
-    let safe_dispatcher = IHelloStarknetSafeDispatcher { contract_address };
-
-    let balance_before = safe_dispatcher.get_balance().unwrap();
-    assert(balance_before == 0, 'Invalid balance');
-
-    match safe_dispatcher.increase_balance(0) {
-        Result::Ok(_) => core::panic_with_felt252('Should have panicked'),
-        Result::Err(panic_data) => {
-            assert(*panic_data.at(0) == 'Amount cannot be 0', *panic_data.at(0));
-        }
-    };
+    let dispatcher = INFTWarperDispatcher { contract_address };
+    let has_role = dispatcher.has_role(DEFAULT_ADMIN_ROLE, contract_address_const::<1>());
+    assert(has_role == true, 'No admin role');
+    let dont_have_role = dispatcher.has_role(DEFAULT_ADMIN_ROLE, contract_address_const::<2>());
+    assert(dont_have_role == false, 'Should not have admin role');
 }
