@@ -1,33 +1,33 @@
-// SPDX-License-Identifier: GNU GLP
+// SPDX-License-Identifier: GNU GPL v3
 // Compatible with OpenZeppelin Contracts for Cairo ^0.14.0
 
-const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
+use starknet::{ContractAddress};
+
+#[starknet::interface]
+pub trait ITestNFT<TContractState> {
+    fn mint(ref self: TContractState, to: ContractAddress, token_id: felt252);
+    fn burn(ref self: TContractState, from: ContractAddress, token_id: felt252);
+    fn owner_of(self: @TContractState, token_id: felt252) -> ContractAddress;
+    fn name(self: @TContractState) -> ByteArray;
+    fn symbol(self: @TContractState) -> ByteArray;
+}
 
 #[starknet::contract]
-mod MyToken {
+mod TestNFT {
     use core::num::traits::Zero;
-    use openzeppelin::access::accesscontrol::AccessControlComponent;
-    use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc721::ERC721Component;
     use openzeppelin::token::erc721::ERC721HooksEmptyImpl;
-    use starknet::ContractAddress;
     use starknet::get_caller_address;
-    use super::{MINTER_ROLE};
+    use starknet::ContractAddress;
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
-    component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
 
     #[abi(embed_v0)]
     impl ERC721MixinImpl = ERC721Component::ERC721MixinImpl<ContractState>;
-    #[abi(embed_v0)]
-    impl AccessControlImpl = AccessControlComponent::AccessControlImpl<ContractState>;
-    #[abi(embed_v0)]
-    impl AccessControlCamelImpl = AccessControlComponent::AccessControlCamelImpl<ContractState>;
 
     impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
-    impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
@@ -35,8 +35,6 @@ mod MyToken {
         erc721: ERC721Component::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
-        #[substorage(v0)]
-        accesscontrol: AccessControlComponent::Storage,
     }
 
     #[event]
@@ -46,17 +44,11 @@ mod MyToken {
         ERC721Event: ERC721Component::Event,
         #[flat]
         SRC5Event: SRC5Component::Event,
-        #[flat]
-        AccessControlEvent: AccessControlComponent::Event,
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, default_admin: ContractAddress, minter: ContractAddress) {
-        self.erc721.initializer("MyToken", "MTK", "");
-        self.accesscontrol.initializer();
-
-        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, default_admin);
-        self.accesscontrol._grant_role(MINTER_ROLE, minter);
+    fn constructor(ref self: ContractState) {
+        self.erc721.initializer("TestNFT", "TNFT", "");
     }
 
     #[generate_trait]
@@ -74,7 +66,6 @@ mod MyToken {
             token_id: u256,
             data: Span<felt252>,
         ) {
-            self.accesscontrol.assert_only_role(MINTER_ROLE);
             self.erc721.safe_mint(recipient, token_id, data);
         }
 

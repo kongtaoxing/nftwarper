@@ -1,3 +1,4 @@
-pub mod NFTWarpedToken;
+pub mod NFTWrappedToken;
 pub mod testNFT;
-pub mod NFTWarper;
+pub mod NFTWrapper;
+pub mod StoreFelt252ArrayTrait;

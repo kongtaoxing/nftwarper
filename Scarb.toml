@@ -1,5 +1,5 @@
 [package]
-name = "nftwarper"
+name = "nftwrapper"
 version = "0.1.0"
 edition = "2023_11"
 
@@ -15,6 +15,7 @@ snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v
 [[target.starknet-contract]]
 sierra = true
 casm = true
+allowed-libfuncs-list.name = "experimental"
 
 [scripts]
 test = "snforge test"

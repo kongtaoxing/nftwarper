@@ -2,7 +2,7 @@
 version = 1
 
 [[package]]
-name = "nftwarper"
+name = "nftwrapper"
 version = "0.1.0"
 dependencies = [
  "openzeppelin",

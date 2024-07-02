@@ -3,8 +3,17 @@
 
 const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
+use starknet::{ContractAddress};
+
+#[starknet::interface]
+pub trait INFTWarpedToken<TContractState> {
+    fn mint(ref self: TContractState, to: ContractAddress, amount: felt252);
+    fn burn(ref self: TContractState, from: ContractAddress, amount: felt252);
+    fn balance_of(self: @TContractState, owner: ContractAddress) -> felt252;
+}
+
 #[starknet::contract]
-mod NFTWarpedToken {
+mod NFTWrappedToken {
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;
@@ -48,8 +57,8 @@ mod NFTWarpedToken {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, default_admin: ContractAddress, minter: ContractAddress) {
-        self.erc20.initializer("MyToken", "MTK");
+    fn constructor(ref self: ContractState, default_admin: ContractAddress, minter: ContractAddress, name: ByteArray, symbol: ByteArray) {
+        self.erc20.initializer(name, symbol);
         self.accesscontrol.initializer();
 
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, default_admin);
