@@ -6,7 +6,7 @@ use starknet::{ContractAddress, ClassHash};
 // ERC20 token interface
 #[starknet::interface]
 pub trait INFTWarpedToken<TContractState> {
-    fn mint(ref self: TContractState, recipient: ContractAddress, amount: felt252);
+    fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
     fn burn(ref self: TContractState, value: felt252);
     fn balance_of(self: @TContractState, owner: ContractAddress) -> felt252;
 }
@@ -34,7 +34,8 @@ pub trait INFTWrapper<TContractState> {
 
 #[starknet::contract]
 mod NFTWrapper {
-    use core::serde::Serde;
+    use core::array::ArrayTrait;
+use core::serde::Serde;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;
@@ -135,18 +136,17 @@ mod NFTWrapper {
     fn wrap(ref self: ContractState, nft_contract: ContractAddress, nft_token_id: u256) {
         assert(self.wrapped_token.read(nft_contract).is_non_zero(), 'create first');
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
-        // println!("address this: {:?}", get_contract_address());
+        println!("address this: {:?}", get_contract_address());
         println!("address caller: {:?}", get_caller_address());
         nft_dispatcher.transfer_from(get_caller_address(), get_contract_address(), nft_token_id);
         let mut nft_pool = self.nft_pools.read(nft_contract);
         nft_pool.append(nft_token_id);
         self.nft_pools.write(nft_contract, nft_pool);
         let wrapped_token_dispatcher = INFTWarpedTokenDispatcher { contract_address: self.wrapped_token.read(nft_contract) };
-        wrapped_token_dispatcher.mint(get_caller_address(), self.conversion_rate.read(nft_contract));
+        wrapped_token_dispatcher.mint(get_caller_address(), self.conversion_rate.read(nft_contract).into());
     }
 
     #[external(v0)]
     fn get_nft_pool(self: @ContractState, nft_contract: ContractAddress) -> Array<u256> {
         self.nft_pools.read(nft_contract)
     }
-}

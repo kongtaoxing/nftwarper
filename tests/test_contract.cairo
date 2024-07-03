@@ -14,6 +14,13 @@ use nftwrapper::testNFT::ITestNFTDispatcherTrait;
 use nftwrapper::NFTWrappedToken::INFTWrappedTokenDispatcher;
 use nftwrapper::NFTWrappedToken::INFTWrappedTokenDispatcherTrait;
 
+const PUBLIC_KEY: felt252 = 0x49a1ecb78d4f98eea4c52f2709045d55b05b9c794f7423de504cc1d4f7303c3;
+fn deploy_account(address: ContractAddress) {
+    let contract = declare("Account").unwrap();
+    let args = array![PUBLIC_KEY];
+    let _address = contract.deploy_at(@args, address);
+}
+
 fn deploy_contract(name: ByteArray) -> ContractAddress {
     let contract = declare(name).unwrap();
     let (contract_address, _) = contract.deploy(@ArrayTrait::new()).unwrap();
@@ -56,7 +63,8 @@ fn test_create_wrapped_token() {
 
 #[test]
 fn test_wrap_nft() {
-    let wrapper_contract_address = deploy_wrapper_contract(contract_address_const::<1>());
+    let default_admin = contract_address_const::<'default_admin'>();
+    let wrapper_contract_address = deploy_wrapper_contract(default_admin);
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
@@ -67,14 +75,15 @@ fn test_wrap_nft() {
     let wrapped_token_dispatcher = INFTWrappedTokenDispatcher { contract_address: wrapped_token_ca };
 
     let caller_address: ContractAddress = contract_address_const::<'caller_address'>();
-    
+    deploy_account(caller_address);
+
+    start_cheat_caller_address(nft_contract_address, caller_address);
     // mint a test NFT
     let token_id: u256 = 1;
     let data: Array<felt252> = array![];
     nft_contract_dispatcher.safe_mint(caller_address, token_id, data.span());
     assert(nft_contract_dispatcher.owner_of(token_id) == caller_address, 'NFT not minted');
     
-    start_cheat_caller_address(nft_contract_address, caller_address);
     // approve the NFT
     nft_contract_dispatcher.set_approval_for_all(wrapper_contract_address, true);
     stop_cheat_caller_address(nft_contract_address);
