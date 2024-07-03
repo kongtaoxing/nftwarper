@@ -6,9 +6,9 @@ const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 use starknet::{ContractAddress};
 
 #[starknet::interface]
-pub trait INFTWarpedToken<TContractState> {
-    fn mint(ref self: TContractState, to: ContractAddress, amount: felt252);
-    fn burn(ref self: TContractState, from: ContractAddress, amount: felt252);
+pub trait INFTWrappedToken<TContractState> {
+    fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
+    fn burn(ref self: TContractState, value: u256);
     fn balance_of(self: @TContractState, owner: ContractAddress) -> felt252;
 }
 
