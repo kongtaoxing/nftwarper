@@ -7,7 +7,7 @@ use starknet::{ContractAddress, ClassHash};
 #[starknet::interface]
 pub trait INFTWarpedToken<TContractState> {
     fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
-    fn burn(ref self: TContractState, value: felt252);
+    fn burn(ref self: TContractState, account: ContractAddress, amount: u256);
     fn balance_of(self: @TContractState, owner: ContractAddress) -> felt252;
 }
 
@@ -34,7 +34,8 @@ pub trait INFTWrapper<TContractState> {
 
 #[starknet::contract]
 mod NFTWrapper {
-    use core::array::ArrayTrait;
+    use openzeppelin::utils::serde::SerializedAppend;
+use core::array::ArrayTrait;
 use core::serde::Serde;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
@@ -118,8 +119,12 @@ use core::serde::Serde;
             get_contract_address().into(),
             get_contract_address().into(),
         ];
-        nft_name.serialize(ref constructor_args);
-        nft_symbol.serialize(ref constructor_args);
+        // // use this
+        // nft_name.serialize(ref constructor_args);
+        // nft_symbol.serialize(ref constructor_args);
+        // or this
+        constructor_args.append_serde(nft_name);
+        constructor_args.append_serde(nft_symbol);
         let (wrapped_token_contract_address, _) = deploy_syscall(token_classhash, salt, constructor_args.span(), false).unwrap_syscall();
         self.wrapped_token.write(nft_contract, wrapped_token_contract_address);
         // set conversion rate
@@ -136,8 +141,8 @@ use core::serde::Serde;
     fn wrap(ref self: ContractState, nft_contract: ContractAddress, nft_token_id: u256) {
         assert(self.wrapped_token.read(nft_contract).is_non_zero(), 'create first');
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
-        println!("address this: {:?}", get_contract_address());
-        println!("address caller: {:?}", get_caller_address());
+        // println!("address this: {:?}", get_contract_address());
+        // println!("address caller: {:?}", get_caller_address());
         nft_dispatcher.transfer_from(get_caller_address(), get_contract_address(), nft_token_id);
         let mut nft_pool = self.nft_pools.read(nft_contract);
         nft_pool.append(nft_token_id);

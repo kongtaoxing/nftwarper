@@ -10,6 +10,8 @@ pub trait INFTWrappedToken<TContractState> {
     fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
     fn burn(ref self: TContractState, value: u256);
     fn balance_of(self: @TContractState, owner: ContractAddress) -> felt252;
+    fn name(self: @TContractState) -> ByteArray;
+    fn symbol(self: @TContractState) -> ByteArray;
 }
 
 #[starknet::contract]

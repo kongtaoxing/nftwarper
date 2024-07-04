@@ -70,9 +70,12 @@ fn test_wrap_nft() {
     let nft_contract_address = deploy_contract("TestNFT");
     let nft_contract_dispatcher = ITestNFTDispatcher { contract_address: nft_contract_address };
 
+    // create wrapped token
     let token_contract = declare("NFTWrappedToken").unwrap();
     let wrapped_token_ca = wrapper_dispatcher.create_wrapped_token(nft_contract_address, token_contract.class_hash, 1);
     let wrapped_token_dispatcher = INFTWrappedTokenDispatcher { contract_address: wrapped_token_ca };
+    assert(wrapped_token_dispatcher.name() == nft_contract_dispatcher.name(), 'name not set');
+    assert(wrapped_token_dispatcher.symbol() == nft_contract_dispatcher.symbol(), 'symbol not set');
 
     let caller_address: ContractAddress = contract_address_const::<'caller_address'>();
     deploy_account(caller_address);
