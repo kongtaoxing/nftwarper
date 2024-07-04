@@ -35,8 +35,6 @@ pub trait INFTWrapper<TContractState> {
 #[starknet::contract]
 mod NFTWrapper {
     use openzeppelin::utils::serde::SerializedAppend;
-use core::array::ArrayTrait;
-use core::serde::Serde;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;
@@ -57,6 +55,8 @@ use core::serde::Serde;
         hash::{HashStateTrait, HashStateExTrait},
         num::traits::Zero,
         traits::TryInto,
+        array::ArrayTrait,
+        serde::Serde,
     };
     use nftwrapper::StoreU256ArrayTrait::StoreU256Array;
     use super::{
@@ -145,7 +145,9 @@ use core::serde::Serde;
         // println!("address caller: {:?}", get_caller_address());
         nft_dispatcher.transfer_from(get_caller_address(), get_contract_address(), nft_token_id);
         let mut nft_pool = self.nft_pools.read(nft_contract);
+        println!("NFT pool now: {:?}", nft_pool);
         nft_pool.append(nft_token_id);
+        println!("NFT pool after: {:?}", nft_pool);
         self.nft_pools.write(nft_contract, nft_pool);
         let wrapped_token_dispatcher = INFTWarpedTokenDispatcher { contract_address: self.wrapped_token.read(nft_contract) };
         wrapped_token_dispatcher.mint(get_caller_address(), self.conversion_rate.read(nft_contract).into());
@@ -155,3 +157,43 @@ use core::serde::Serde;
     fn get_nft_pool(self: @ContractState, nft_contract: ContractAddress) -> Array<u256> {
         self.nft_pools.read(nft_contract)
     }
+
+    fn remove_nft_from_pool(ref self: ContractState, nft_contract: ContractAddress, index: u32) {
+        let last_index: u32 = self.nft_pools.read(nft_contract).len().into() - 1;
+        println!("pool length: {:?}", self.nft_pools.read(nft_contract).len());
+        let nft_pool_before = self.nft_pools.read(nft_contract);
+        let last_index_value = nft_pool_before.at(last_index);
+        let mut nft_pool_after: Array<u256> = array![];
+        let mut i = 0;
+        loop {
+            if i == last_index {
+                break;
+            }
+            if i == index {
+                nft_pool_after.append(*last_index_value);
+            } else {
+                nft_pool_after.append(*nft_pool_before.at(i));
+            }
+            i += 1;
+        };
+        self.nft_pools.write(nft_contract, nft_pool_after);
+    }
+
+    fn random_index(len: u32) -> u32 {
+        let random = generate_random_number().try_into().unwrap() % 0xffffffff_u256;
+        let index: u32 = random.try_into().unwrap() % len;
+        index
+    }
+
+    #[external(v0)]
+    fn unwrap(ref self: ContractState, nft_contract: ContractAddress) {
+        assert(self.nft_pools.read(nft_contract).len() > 0, 'empty pool');
+        let wrapped_token = INFTWarpedTokenDispatcher { contract_address: self.wrapped_token.read(nft_contract) };
+        wrapped_token.burn(get_caller_address(), self.conversion_rate.read(nft_contract).into());
+        let index = random_index(self.nft_pools.read(nft_contract).len());
+        // println!("index: {:?}", index);
+        let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
+        nft_dispatcher.transfer_from(get_contract_address(), get_caller_address(), *self.nft_pools.read(nft_contract).at(index));
+        remove_nft_from_pool(ref self, nft_contract, index);
+    }
+}

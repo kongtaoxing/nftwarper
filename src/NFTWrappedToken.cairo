@@ -8,7 +8,8 @@ use starknet::{ContractAddress};
 #[starknet::interface]
 pub trait INFTWrappedToken<TContractState> {
     fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
-    fn burn(ref self: TContractState, value: u256);
+    fn burn(ref self: TContractState, account: ContractAddress, amount: u256);
+    fn approve(ref self: TContractState, spender: ContractAddress, amount: u256) -> bool;
     fn balance_of(self: @TContractState, owner: ContractAddress) -> felt252;
     fn name(self: @TContractState) -> ByteArray;
     fn symbol(self: @TContractState) -> ByteArray;
@@ -71,8 +72,8 @@ mod NFTWrappedToken {
     #[abi(per_item)]
     impl ExternalImpl of ExternalTrait {
         #[external(v0)]
-        fn burn(ref self: ContractState, value: u256) {
-            self.erc20.burn(get_caller_address(), value);
+        fn burn(ref self: ContractState, account: ContractAddress, value: u256) {
+            self.erc20.burn(account, value);
         }
 
         #[external(v0)]
