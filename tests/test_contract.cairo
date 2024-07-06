@@ -14,6 +14,8 @@ use nftwrapper::testNFT::ITestNFTDispatcher;
 use nftwrapper::testNFT::ITestNFTDispatcherTrait;
 use nftwrapper::NFTWrappedToken::INFTWrappedTokenDispatcher;
 use nftwrapper::NFTWrappedToken::INFTWrappedTokenDispatcherTrait;
+use nftwrapper::NFTWrappedToken::INFTWrappedTokenSafeDispatcher;
+use nftwrapper::NFTWrappedToken::INFTWrappedTokenSafeDispatcherTrait;
 
 const PUBLIC_KEY: felt252 = 0x49a1ecb78d4f98eea4c52f2709045d55b05b9c794f7423de504cc1d4f7303c3;
 fn deploy_account(address: ContractAddress) {
@@ -172,4 +174,31 @@ fn test_unwrap_nft() {
     stop_cheat_caller_address(wrapper_contract_address);
     // println!("nft pool: {:?}", wrapper_dispatcher.get_nft_pool(nft_contract_address));
     assert(wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 2, 'NFT not removed from pool');
+}
+
+#[test]
+#[feature("safe_dispatcher")]
+fn test_mint_wrapped_token_without_permission() {
+    let default_admin = contract_address_const::<'default_admin'>();
+    let wrapper_contract_address = deploy_wrapper_contract(default_admin);
+    let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
+
+    let nft_contract_address = deploy_contract("TestNFT");
+
+    // create wrapped token
+    let token_contract = declare("NFTWrappedToken").unwrap();
+    let wrapped_token_ca = wrapper_dispatcher.create_wrapped_token(nft_contract_address, token_contract.class_hash, 1);
+    let wrapped_token_safe_dispatcher = INFTWrappedTokenSafeDispatcher { contract_address: wrapped_token_ca };
+
+    // test mint without permission
+    let caller_address: ContractAddress = contract_address_const::<'caller_address'>();
+    deploy_account(caller_address);
+    start_cheat_caller_address(wrapped_token_ca, caller_address);
+    match wrapped_token_safe_dispatcher.mint(caller_address, 1) {
+        Result::Ok(_) => panic!("Minting wrapped token should fail without permission"),
+        Result::Err(panic_data) => {
+            assert(*panic_data.at(0) == 'Caller is missing role', *panic_data.at(0));
+        }
+    }
+    stop_cheat_caller_address(wrapped_token_ca);
 }
