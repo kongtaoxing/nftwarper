@@ -23,7 +23,9 @@ snforge test
 Then you can see the result.
 
 ## TODO
-- [ ] Fix U256 `Store` trait (waiting for cairo 2.7.0)
+- [x] Fix U256 `Store` trait (waiting for cairo 2.7.0)
+
+  (Fixed using maintain a `(contract_address, index) -> value` mapping and `(contract_address -> array_length)` mapping. Still waing for cairo native array storage.)
 - [ ] add more tests for access control
 
 You are welcomed to contribute!

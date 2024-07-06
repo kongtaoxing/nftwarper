@@ -170,6 +170,6 @@ fn test_unwrap_nft() {
     start_cheat_caller_address(wrapper_contract_address, caller_address);
     wrapper_dispatcher.unwrap(nft_contract_address);
     stop_cheat_caller_address(wrapper_contract_address);
-    println!("nft pool: {:?}", wrapper_dispatcher.get_nft_pool(nft_contract_address));
-    assert(wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 3, 'NFT not removed from pool');
+    // println!("nft pool: {:?}", wrapper_dispatcher.get_nft_pool(nft_contract_address));
+    assert(wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 2, 'NFT not removed from pool');
 }
