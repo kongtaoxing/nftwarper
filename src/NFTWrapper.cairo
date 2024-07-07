@@ -81,6 +81,7 @@ mod NFTWrapper {
         #[substorage(v0)]
         src5: SRC5Component::Storage,
         conversion_rate: LegacyMap::<ContractAddress, felt252>,  // NFT contract address -> conversion rate
+        wrapped_token_classhash: ClassHash,
         // nft_pools: LegacyMap::<ContractAddress, Array<u256>>,  // NFT contract address -> Array of NFT token ids
         nft_pools_value: LegacyMap::<(ContractAddress, u32), u256>,  // (NFT contract address, index) -> NFT token ids
         nft_pools_length: LegacyMap::<ContractAddress, u32>,  // NFT contract address -> Array length
@@ -96,10 +97,11 @@ mod NFTWrapper {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, default_admin: ContractAddress) {
+    fn constructor(ref self: ContractState, default_admin: ContractAddress, wrapped_token_classhash: ClassHash) {
         self.accesscontrol.initializer();
 
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, default_admin);
+        self.wrapped_token_classhash.write(wrapped_token_classhash);
     }
 
     fn generate_random_number() -> felt252 {
@@ -113,6 +115,7 @@ mod NFTWrapper {
     #[external(v0)]
     fn create_wrapped_token(ref self: ContractState, nft_contract: ContractAddress, token_classhash: ClassHash, conversion_rate: felt252) -> ContractAddress {
         assert(self.wrapped_token.read(nft_contract).is_zero(), 'already exist');
+        assert(self.wrapped_token_classhash.read() == token_classhash, 'invalid classhash');
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
         let nft_name = nft_dispatcher.name();
         let nft_symbol = nft_dispatcher.symbol();

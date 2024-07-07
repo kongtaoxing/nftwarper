@@ -4,7 +4,7 @@ use core::integer::BoundedInt;
 use starknet::{ContractAddress, contract_address_const, get_caller_address, get_block_number, get_contract_address};
 use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
 
-use snforge_std::{declare, ContractClassTrait, start_cheat_caller_address, stop_cheat_caller_address};
+use snforge_std::{declare, ContractClass, ContractClassTrait, start_cheat_caller_address, stop_cheat_caller_address};
 
 use nftwrapper::NFTWrapper::INFTWrapperSafeDispatcher;
 use nftwrapper::NFTWrapper::INFTWrapperSafeDispatcherTrait;
@@ -30,19 +30,21 @@ fn deploy_contract(name: ByteArray) -> ContractAddress {
     contract_address
 }
 
-fn deploy_wrapper_contract(default_admin: ContractAddress) -> ContractAddress {
+fn deploy_wrapper_contract(default_admin: ContractAddress) -> (ContractClass, ContractAddress) {
     let contract = declare("NFTWrapper").unwrap();
+    let wrapped_token = declare("NFTWrappedToken").unwrap();
     let args: Array<felt252> = array![
-        default_admin.into()
+        default_admin.into(),
+        wrapped_token.class_hash.into()
     ];
     let (contract_address, _) = contract.deploy(@args).unwrap();
-    contract_address
+    (wrapped_token, contract_address)
 
 }
 
 #[test]
 fn test_get_default_admin() {
-    let contract_address = deploy_wrapper_contract(contract_address_const::<1>());
+    let (_, contract_address) = deploy_wrapper_contract(contract_address_const::<1>());
 
     let dispatcher = INFTWrapperDispatcher { contract_address };
     let has_role = dispatcher.has_role(DEFAULT_ADMIN_ROLE, contract_address_const::<1>());
@@ -53,12 +55,12 @@ fn test_get_default_admin() {
 
 #[test]
 fn test_create_wrapped_token() {
-    let wrapper_contract_address = deploy_wrapper_contract(contract_address_const::<1>());
+    let default_admin = contract_address_const::<'default_admin'>();
+    let (token_contract, wrapper_contract_address) = deploy_wrapper_contract(default_admin);
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
 
-    let token_contract = declare("NFTWrappedToken").unwrap();
     wrapper_dispatcher.create_wrapped_token(nft_contract_address, token_contract.class_hash, 1);
     let conversion_rate = wrapper_dispatcher.get_conversion_rate(nft_contract_address);
     assert(conversion_rate == 1, 'Conversion rate should be 1');
@@ -67,14 +69,13 @@ fn test_create_wrapped_token() {
 #[test]
 fn test_wrap_nft() {
     let default_admin = contract_address_const::<'default_admin'>();
-    let wrapper_contract_address = deploy_wrapper_contract(default_admin);
+    let (token_contract, wrapper_contract_address) = deploy_wrapper_contract(default_admin);
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
     let nft_contract_dispatcher = ITestNFTDispatcher { contract_address: nft_contract_address };
 
     // create wrapped token
-    let token_contract = declare("NFTWrappedToken").unwrap();
     let wrapped_token_ca = wrapper_dispatcher.create_wrapped_token(nft_contract_address, token_contract.class_hash, 1);
     let wrapped_token_dispatcher = INFTWrappedTokenDispatcher { contract_address: wrapped_token_ca };
     assert(wrapped_token_dispatcher.name() == nft_contract_dispatcher.name(), 'name not set');
@@ -107,14 +108,13 @@ fn test_wrap_nft() {
 #[test]
 fn test_unwrap_nft() {
     let default_admin = contract_address_const::<'default_admin'>();
-    let wrapper_contract_address = deploy_wrapper_contract(default_admin);
+    let (token_contract, wrapper_contract_address) = deploy_wrapper_contract(default_admin);
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
     let nft_contract_dispatcher = ITestNFTDispatcher { contract_address: nft_contract_address };
 
     // create wrapped token
-    let token_contract = declare("NFTWrappedToken").unwrap();
     let wrapped_token_ca = wrapper_dispatcher.create_wrapped_token(nft_contract_address, token_contract.class_hash, 1);
     let wrapped_token_dispatcher = INFTWrappedTokenDispatcher { contract_address: wrapped_token_ca };
     assert(wrapped_token_dispatcher.name() == nft_contract_dispatcher.name(), 'name not set');
@@ -180,13 +180,12 @@ fn test_unwrap_nft() {
 #[feature("safe_dispatcher")]
 fn test_mint_wrapped_token_without_permission() {
     let default_admin = contract_address_const::<'default_admin'>();
-    let wrapper_contract_address = deploy_wrapper_contract(default_admin);
+    let (token_contract, wrapper_contract_address) = deploy_wrapper_contract(default_admin);
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
 
     // create wrapped token
-    let token_contract = declare("NFTWrappedToken").unwrap();
     let wrapped_token_ca = wrapper_dispatcher.create_wrapped_token(nft_contract_address, token_contract.class_hash, 1);
     let wrapped_token_safe_dispatcher = INFTWrappedTokenSafeDispatcher { contract_address: wrapped_token_ca };
 
@@ -201,4 +200,20 @@ fn test_mint_wrapped_token_without_permission() {
         }
     }
     stop_cheat_caller_address(wrapped_token_ca);
+}
+
+#[test]
+#[feature("safe_dispatcher")]
+fn test_create_unauthorized_wrapped_token() {
+    let default_admin = contract_address_const::<'default_admin'>();
+    let (_, wrapper_contract_address) = deploy_wrapper_contract(default_admin);
+    let wrapper_safe_dispatcher = INFTWrapperSafeDispatcher { contract_address: wrapper_contract_address };
+    let nft_contract_address = deploy_contract("TestNFT");
+    match wrapper_safe_dispatcher.create_wrapped_token(nft_contract_address, declare("MaliciousToken").unwrap().class_hash, 1) {
+        Result::Ok(_) => panic!("Creating wrapped token should fail without permission"),
+        Result::Err(panic_data) => {
+            assert(*panic_data.at(0) == 'invalid classhash', *panic_data.at(0));
+        }
+    }
+
 }
