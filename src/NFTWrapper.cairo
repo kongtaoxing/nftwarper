@@ -30,6 +30,7 @@ pub trait INFTWrapper<TContractState> {
     fn has_role(self: @TContractState, role: felt252, account: ContractAddress) -> bool;
     fn get_conversion_rate(self: @TContractState, nft_contract: ContractAddress) -> felt252;
     fn get_nft_pool(self: @TContractState, nft_contract: ContractAddress) -> Array<u256>;
+    fn create_dex_pool(ref self: TContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16) -> ContractAddress;
 }
 
 #[starknet::contract]
@@ -86,6 +87,7 @@ mod NFTWrapper {
         nft_pools_value: LegacyMap::<(ContractAddress, u32), u256>,  // (NFT contract address, index) -> NFT token ids
         nft_pools_length: LegacyMap::<ContractAddress, u32>,  // NFT contract address -> Array length
         wrapped_token: LegacyMap::<ContractAddress, ContractAddress>,  // NFT contract address -> wrapped token contract address
+        dex_pool: LegacyMap::<ContractAddress, ContractAddress>,  // NFT contract address -> dex pool contract address
     }
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -235,5 +237,22 @@ mod NFTWrapper {
         // cairo native array is not supported yet
         nft_dispatcher.transfer_from(get_contract_address(), get_caller_address(), self.nft_pools_value.read((nft_contract, index)));
         remove_nft_from_pool(ref self, nft_contract, index);
+    }
+
+    #[external(v0)]
+    fn create_dex_pool(ref self: ContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16) -> ContractAddress {
+        assert(self.dex_pool.read(nft_contract).is_zero(), 'already exist');
+        let wrapped_token_ca = self.wrapped_token.read(nft_contract);
+        assert(wrapped_token_ca.is_non_zero(), 'create wrapped token first');
+        let wrapped_token_dispatcher = INFTWarpedTokenDispatcher { contract_address: wrapped_token_ca };
+        assert(wrapped_token_dispatcher.balance_of(get_caller_address()).is_non_zero(), 'no balance');
+        let salt = generate_random_number();
+        let mut constructor_args: Array<felt252> = array![
+            wrapped_token_ca.into(),
+            fee.into(),
+        ];
+        let (dex_pool_contract_address, _) = deploy_syscall(dex_classhash, salt, constructor_args.span(), false).unwrap_syscall();
+        self.dex_pool.write(nft_contract, dex_pool_contract_address);
+        dex_pool_contract_address
     }
 }

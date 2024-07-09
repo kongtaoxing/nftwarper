@@ -27,5 +27,6 @@ Then you can see the result.
 
   (Fixed using maintain a `(contract_address, index) -> value` mapping and `(contract_address -> array_length)` mapping. Still waing for cairo native array storage.)
 - [x] add more tests for access control
+- [x] Create a dex for the wrapped token.
 
 You are welcomed to contribute!
