@@ -26,7 +26,8 @@ Then you can see the result.
 - [x] Fix U256 `Store` trait (waiting for cairo 2.7.0)
 
   (Fixed using maintain a `(contract_address, index) -> value` mapping and `(contract_address -> array_length)` mapping. Still waing for cairo native array storage.)
-- [x] add more tests for access control
+- [x] Add more tests for access control
 - [x] Create a dex for the wrapped token.
+- [ ] Add more function to the pool.
 
 You are welcomed to contribute!
