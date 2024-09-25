@@ -1,15 +1,5 @@
-use starknet::account::Call;
-
-#[starknet::interface]
-trait IAccount<T> {
-    fn public_key(self: @T) -> felt252;
-    fn supports_interface(self: @T, interface_id: felt252) -> bool;
-    fn is_valid_signature(self: @T, hash: felt252, signature: Array<felt252>) -> felt252;
-    fn __execute__(self: @T, calls: Array<Call>) -> Array<Span<felt252>>;
-    fn __validate__(self: @T, calls: Array<Call>) -> felt252;
-    fn __validate_declare__(self: @T, class_hash: felt252) -> felt252;
-    fn __validate_deploy__(self: @T, class_hash: felt252, salt: felt252, public_key: felt252) -> felt252;
-}
+// SPDX-License-Identifier: MIT
+// Compatible with OpenZeppelin Contracts for Cairo ^0.16.0
 
 #[starknet::contract(account)]
 mod Account {
@@ -19,9 +9,9 @@ mod Account {
     component!(path: AccountComponent, storage: account, event: AccountEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
 
-    // Account Mixin
     #[abi(embed_v0)]
     impl AccountMixinImpl = AccountComponent::AccountMixinImpl<ContractState>;
+
     impl AccountInternalImpl = AccountComponent::InternalImpl<ContractState>;
 
     #[storage]
@@ -29,7 +19,7 @@ mod Account {
         #[substorage(v0)]
         account: AccountComponent::Storage,
         #[substorage(v0)]
-        src5: SRC5Component::Storage
+        src5: SRC5Component::Storage,
     }
 
     #[event]
@@ -38,7 +28,7 @@ mod Account {
         #[flat]
         AccountEvent: AccountComponent::Event,
         #[flat]
-        SRC5Event: SRC5Component::Event
+        SRC5Event: SRC5Component::Event,
     }
 
     #[constructor]

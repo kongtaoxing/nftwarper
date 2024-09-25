@@ -33,7 +33,8 @@ mod NFTWrappedToken {
     #[abi(embed_v0)]
     impl ERC20MixinImpl = ERC20Component::ERC20MixinImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlMixinImpl = AccessControlComponent::AccessControlMixinImpl<ContractState>;
+    impl AccessControlMixinImpl =
+        AccessControlComponent::AccessControlMixinImpl<ContractState>;
 
     impl ERC20InternalImpl = ERC20Component::InternalImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
@@ -60,7 +61,13 @@ mod NFTWrappedToken {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, default_admin: ContractAddress, minter: ContractAddress, name: ByteArray, symbol: ByteArray) {
+    fn constructor(
+        ref self: ContractState,
+        default_admin: ContractAddress,
+        minter: ContractAddress,
+        name: ByteArray,
+        symbol: ByteArray
+    ) {
         self.erc20.initializer(name, symbol);
         self.accesscontrol.initializer();
 

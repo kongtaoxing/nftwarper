@@ -30,11 +30,11 @@ pub mod Dex {
     }
 
     #[constructor]
-    fn constructor(
-        ref self: ContractState, token0: ContractAddress, fee: u16
-    ) {
+    fn constructor(ref self: ContractState, token0: ContractAddress, fee: u16) {
         // assert(fee <= 1000, 'fee > 1000');
-        let ether_ca = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        let ether_ca = contract_address_const::<
+            0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7
+        >();
         self.token0.write(IERC20Dispatcher { contract_address: token0 });
         self.token1.write(IERC20Dispatcher { contract_address: ether_ca });
         self.fee.write(fee);

@@ -14,8 +14,12 @@ pub trait INFTWarpedToken<TContractState> {
 // ERC721 token interface
 #[starknet::interface]
 pub trait INFTContract<TContractState> {
-    fn safe_mint(ref self: TContractState, recipient: ContractAddress, token_id: u256, data: Span<felt252>);
-    fn transfer_from(ref self: TContractState, from: ContractAddress, to: ContractAddress, token_id: u256);
+    fn safe_mint(
+        ref self: TContractState, recipient: ContractAddress, token_id: u256, data: Span<felt252>
+    );
+    fn transfer_from(
+        ref self: TContractState, from: ContractAddress, to: ContractAddress, token_id: u256
+    );
     fn owner_of(self: @TContractState, token_id: u256) -> ContractAddress;
     fn name(self: @TContractState) -> ByteArray;
     fn symbol(self: @TContractState) -> ByteArray;
@@ -24,13 +28,20 @@ pub trait INFTContract<TContractState> {
 // NFTWrapper contract interface
 #[starknet::interface]
 pub trait INFTWrapper<TContractState> {
-    fn create_wrapped_token(ref self: TContractState, nft_contract: ContractAddress, token_classhash: ClassHash, conversion_rate: felt252) -> ContractAddress;
+    fn create_wrapped_token(
+        ref self: TContractState,
+        nft_contract: ContractAddress,
+        token_classhash: ClassHash,
+        conversion_rate: felt252
+    ) -> ContractAddress;
     fn wrap(ref self: TContractState, nft_contract: ContractAddress, nft_token_id: u256);
     fn unwrap(ref self: TContractState, nft_contract: ContractAddress);
     fn has_role(self: @TContractState, role: felt252, account: ContractAddress) -> bool;
     fn get_conversion_rate(self: @TContractState, nft_contract: ContractAddress) -> felt252;
     fn get_nft_pool(self: @TContractState, nft_contract: ContractAddress) -> Array<u256>;
-    fn create_dex_pool(ref self: TContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16) -> ContractAddress;
+    fn create_dex_pool(
+        ref self: TContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16
+    ) -> ContractAddress;
 }
 
 #[starknet::contract]
@@ -40,30 +51,17 @@ mod NFTWrapper {
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;
     use starknet::{
-        ContractAddress, 
-        Store, 
-        ClassHash,
-        contract_address_const, 
-        get_block_number, 
-        get_contract_address, 
-        get_caller_address,
-        get_block_timestamp,
-        syscalls::deploy_syscall,
+        ContractAddress, Store, ClassHash, contract_address_const, get_block_number,
+        get_contract_address, get_caller_address, get_block_timestamp, syscalls::deploy_syscall,
         SyscallResultTrait,
     };
     use core::{
-        pedersen::PedersenTrait,
-        hash::{HashStateTrait, HashStateExTrait},
-        num::traits::Zero,
-        traits::TryInto,
-        array::ArrayTrait,
-        serde::Serde,
+        pedersen::PedersenTrait, hash::{HashStateTrait, HashStateExTrait}, num::traits::Zero,
+        traits::TryInto, array::ArrayTrait, serde::Serde,
     };
     use nftwrapper::StoreU256ArrayTrait::StoreU256Array;
     use super::{
-        INFTContractDispatcher,
-        INFTContractDispatcherTrait,
-        INFTWarpedTokenDispatcher,
+        INFTContractDispatcher, INFTContractDispatcherTrait, INFTWarpedTokenDispatcher,
         INFTWarpedTokenDispatcherTrait,
     };
 
@@ -71,7 +69,8 @@ mod NFTWrapper {
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
 
     #[abi(embed_v0)]
-    impl AccessControlMixinImpl = AccessControlComponent::AccessControlMixinImpl<ContractState>;
+    impl AccessControlMixinImpl =
+        AccessControlComponent::AccessControlMixinImpl<ContractState>;
 
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
 
@@ -81,13 +80,23 @@ mod NFTWrapper {
         accesscontrol: AccessControlComponent::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
-        conversion_rate: LegacyMap::<ContractAddress, felt252>,  // NFT contract address -> conversion rate
+        conversion_rate: LegacyMap::<
+            ContractAddress, felt252
+        >, // NFT contract address -> conversion rate
         wrapped_token_classhash: ClassHash,
         // nft_pools: LegacyMap::<ContractAddress, Array<u256>>,  // NFT contract address -> Array of NFT token ids
-        nft_pools_value: LegacyMap::<(ContractAddress, u32), u256>,  // (NFT contract address, index) -> NFT token ids
-        nft_pools_length: LegacyMap::<ContractAddress, u32>,  // NFT contract address -> Array length
-        wrapped_token: LegacyMap::<ContractAddress, ContractAddress>,  // NFT contract address -> wrapped token contract address
-        dex_pool: LegacyMap::<ContractAddress, ContractAddress>,  // NFT contract address -> dex pool contract address
+        nft_pools_value: LegacyMap::<
+            (ContractAddress, u32), u256
+        >, // (NFT contract address, index) -> NFT token ids
+        nft_pools_length: LegacyMap::<
+            ContractAddress, u32
+        >, // NFT contract address -> Array length
+        wrapped_token: LegacyMap::<
+            ContractAddress, ContractAddress
+        >, // NFT contract address -> wrapped token contract address
+        dex_pool: LegacyMap::<
+            ContractAddress, ContractAddress
+        >, // NFT contract address -> dex pool contract address
     }
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -99,7 +108,9 @@ mod NFTWrapper {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, default_admin: ContractAddress, wrapped_token_classhash: ClassHash) {
+    fn constructor(
+        ref self: ContractState, default_admin: ContractAddress, wrapped_token_classhash: ClassHash
+    ) {
         self.accesscontrol.initializer();
 
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, default_admin);
@@ -115,7 +126,12 @@ mod NFTWrapper {
     }
 
     #[external(v0)]
-    fn create_wrapped_token(ref self: ContractState, nft_contract: ContractAddress, token_classhash: ClassHash, conversion_rate: felt252) -> ContractAddress {
+    fn create_wrapped_token(
+        ref self: ContractState,
+        nft_contract: ContractAddress,
+        token_classhash: ClassHash,
+        conversion_rate: felt252
+    ) -> ContractAddress {
         assert(self.wrapped_token.read(nft_contract).is_zero(), 'already exist');
         assert(self.wrapped_token_classhash.read() == token_classhash, 'invalid classhash');
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
@@ -123,8 +139,7 @@ mod NFTWrapper {
         let nft_symbol = nft_dispatcher.symbol();
         let salt = generate_random_number();
         let mut constructor_args: Array<felt252> = array![
-            get_contract_address().into(),
-            get_contract_address().into(),
+            get_contract_address().into(), get_contract_address().into(),
         ];
         // // use this
         // nft_name.serialize(ref constructor_args);
@@ -132,7 +147,10 @@ mod NFTWrapper {
         // or this
         constructor_args.append_serde(nft_name);
         constructor_args.append_serde(nft_symbol);
-        let (wrapped_token_contract_address, _) = deploy_syscall(token_classhash, salt, constructor_args.span(), false).unwrap_syscall();
+        let (wrapped_token_contract_address, _) = deploy_syscall(
+            token_classhash, salt, constructor_args.span(), false
+        )
+            .unwrap_syscall();
         self.wrapped_token.write(nft_contract, wrapped_token_contract_address);
         // set conversion rate
         self.conversion_rate.write(nft_contract, conversion_rate);
@@ -161,8 +179,11 @@ mod NFTWrapper {
         let nft_pool_length = self.nft_pools_length.read(nft_contract);
         self.nft_pools_value.write((nft_contract, nft_pool_length), nft_token_id);
         self.nft_pools_length.write(nft_contract, nft_pool_length + 1);
-        let wrapped_token_dispatcher = INFTWarpedTokenDispatcher { contract_address: self.wrapped_token.read(nft_contract) };
-        wrapped_token_dispatcher.mint(get_caller_address(), self.conversion_rate.read(nft_contract).into());
+        let wrapped_token_dispatcher = INFTWarpedTokenDispatcher {
+            contract_address: self.wrapped_token.read(nft_contract)
+        };
+        wrapped_token_dispatcher
+            .mint(get_caller_address(), self.conversion_rate.read(nft_contract).into());
     }
 
     #[external(v0)]
@@ -223,7 +244,9 @@ mod NFTWrapper {
         // cairo native array is not supported yet
         assert(self.nft_pools_length.read(nft_contract) > 0, 'empty pool');
 
-        let wrapped_token = INFTWarpedTokenDispatcher { contract_address: self.wrapped_token.read(nft_contract) };
+        let wrapped_token = INFTWarpedTokenDispatcher {
+            contract_address: self.wrapped_token.read(nft_contract)
+        };
         wrapped_token.burn(get_caller_address(), self.conversion_rate.read(nft_contract).into());
         // // cairo native storage array
         // let index = random_index(self.nft_pools.read(nft_contract).len());
@@ -235,23 +258,34 @@ mod NFTWrapper {
         // // cairo native storage array
         // nft_dispatcher.transfer_from(get_contract_address(), get_caller_address(), *self.nft_pools.read(nft_contract).at(index));
         // cairo native array is not supported yet
-        nft_dispatcher.transfer_from(get_contract_address(), get_caller_address(), self.nft_pools_value.read((nft_contract, index)));
+        nft_dispatcher
+            .transfer_from(
+                get_contract_address(),
+                get_caller_address(),
+                self.nft_pools_value.read((nft_contract, index))
+            );
         remove_nft_from_pool(ref self, nft_contract, index);
     }
 
     #[external(v0)]
-    fn create_dex_pool(ref self: ContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16) -> ContractAddress {
+    fn create_dex_pool(
+        ref self: ContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16
+    ) -> ContractAddress {
         assert(self.dex_pool.read(nft_contract).is_zero(), 'already exist');
         let wrapped_token_ca = self.wrapped_token.read(nft_contract);
         assert(wrapped_token_ca.is_non_zero(), 'create wrapped token first');
-        let wrapped_token_dispatcher = INFTWarpedTokenDispatcher { contract_address: wrapped_token_ca };
-        assert(wrapped_token_dispatcher.balance_of(get_caller_address()).is_non_zero(), 'no balance');
+        let wrapped_token_dispatcher = INFTWarpedTokenDispatcher {
+            contract_address: wrapped_token_ca
+        };
+        assert(
+            wrapped_token_dispatcher.balance_of(get_caller_address()).is_non_zero(), 'no balance'
+        );
         let salt = generate_random_number();
-        let mut constructor_args: Array<felt252> = array![
-            wrapped_token_ca.into(),
-            fee.into(),
-        ];
-        let (dex_pool_contract_address, _) = deploy_syscall(dex_classhash, salt, constructor_args.span(), false).unwrap_syscall();
+        let mut constructor_args: Array<felt252> = array![wrapped_token_ca.into(), fee.into(),];
+        let (dex_pool_contract_address, _) = deploy_syscall(
+            dex_classhash, salt, constructor_args.span(), false
+        )
+            .unwrap_syscall();
         self.dex_pool.write(nft_contract, dex_pool_contract_address);
         dex_pool_contract_address
     }

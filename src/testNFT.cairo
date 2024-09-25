@@ -5,7 +5,9 @@ use starknet::{ContractAddress};
 
 #[starknet::interface]
 pub trait ITestNFT<TContractState> {
-    fn safe_mint(ref self: TContractState, recipient: ContractAddress, token_id: u256, data: Span<felt252>);
+    fn safe_mint(
+        ref self: TContractState, recipient: ContractAddress, token_id: u256, data: Span<felt252>
+    );
     fn set_approval_for_all(ref self: TContractState, operator: ContractAddress, approved: bool);
     fn owner_of(self: @TContractState, token_id: u256) -> ContractAddress;
     fn name(self: @TContractState) -> ByteArray;
@@ -71,10 +73,7 @@ mod TestNFT {
 
         #[external(v0)]
         fn safeMint(
-            ref self: ContractState,
-            recipient: ContractAddress,
-            tokenId: u256,
-            data: Span<felt252>,
+            ref self: ContractState, recipient: ContractAddress, tokenId: u256, data: Span<felt252>,
         ) {
             self.safe_mint(recipient, tokenId, data);
         }

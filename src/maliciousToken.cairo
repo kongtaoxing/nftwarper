@@ -33,7 +33,8 @@ mod MaliciousToken {
     #[abi(embed_v0)]
     impl ERC20MixinImpl = ERC20Component::ERC20MixinImpl<ContractState>;
     #[abi(embed_v0)]
-    impl AccessControlMixinImpl = AccessControlComponent::AccessControlMixinImpl<ContractState>;
+    impl AccessControlMixinImpl =
+        AccessControlComponent::AccessControlMixinImpl<ContractState>;
 
     impl ERC20InternalImpl = ERC20Component::InternalImpl<ContractState>;
     impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
@@ -60,7 +61,9 @@ mod MaliciousToken {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, default_admin: ContractAddress, minter: ContractAddress) {
+    fn constructor(
+        ref self: ContractState, default_admin: ContractAddress, minter: ContractAddress
+    ) {
         self.erc20.initializer("Malicious Token", "MT");
         self.accesscontrol.initializer();
 
