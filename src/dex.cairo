@@ -14,7 +14,11 @@ pub mod Dex {
     use starknet::{
         ContractAddress, get_caller_address, get_contract_address, contract_address_const
     };
-    use core::integer::u256_sqrt;
+    use starknet::storage::{
+        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map
+    };
+    // use core::integer::u256_sqrt;
+    use core::num::traits::Sqrt;
 
     #[storage]
     struct Storage {
@@ -23,7 +27,7 @@ pub mod Dex {
         reserve0: u256,
         reserve1: u256,
         total_supply: u256,
-        balance_of: LegacyMap::<ContractAddress, u256>,
+        balance_of: Map::<ContractAddress, u256>,
         // Fee 0 - 1000 (0% - 100%, 1 decimal places)
         // E.g. 3 = 0.3%
         fee: u16,
@@ -43,12 +47,12 @@ pub mod Dex {
     #[generate_trait]
     impl PrivateFunctions of PrivateFunctionsTrait {
         fn _mint(ref self: ContractState, to: ContractAddress, amount: u256) {
-            self.balance_of.write(to, self.balance_of.read(to) + amount);
+            self.balance_of.entry(to).write(self.balance_of.entry(to).read() + amount);
             self.total_supply.write(self.total_supply.read() + amount);
         }
 
         fn _burn(ref self: ContractState, from: ContractAddress, amount: u256) {
-            self.balance_of.write(from, self.balance_of.read(from) - amount);
+            self.balance_of.entry(from).write(self.balance_of.entry(from).read() - amount);
             self.total_supply.write(self.total_supply.read() - amount);
         }
 
@@ -194,7 +198,7 @@ pub mod Dex {
 
             let total_supply = self.total_supply.read();
             let shares = if (total_supply == 0) {
-                u256_sqrt(amount0 * amount1).into()
+                Sqrt::sqrt(amount0 * amount1).into()
             } else {
                 PrivateFunctions::min(
                     amount0 * total_supply / reserve0, amount1 * total_supply / reserve1

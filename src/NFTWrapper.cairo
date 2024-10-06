@@ -35,7 +35,7 @@ pub trait INFTWrapper<TContractState> {
         conversion_rate: felt252
     ) -> ContractAddress;
     fn wrap(ref self: TContractState, nft_contract: ContractAddress, nft_token_id: u256);
-    fn unwrap(ref self: TContractState, nft_contract: ContractAddress);
+    fn unwrap(ref self: TContractState, nft_contract: ContractAddress, nft_token_id: u256);
     fn has_role(self: @TContractState, role: felt252, account: ContractAddress) -> bool;
     fn get_conversion_rate(self: @TContractState, nft_contract: ContractAddress) -> felt252;
     fn get_nft_pool(self: @TContractState, nft_contract: ContractAddress) -> Array<u256>;
@@ -51,18 +51,20 @@ mod NFTWrapper {
     use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
     use openzeppelin::introspection::src5::SRC5Component;
     use starknet::{
-        ContractAddress, Store, ClassHash, contract_address_const, get_block_number,
+        ContractAddress, ClassHash, get_block_number,
         get_contract_address, get_caller_address, get_block_timestamp, syscalls::deploy_syscall,
         SyscallResultTrait,
     };
     use core::{
         pedersen::PedersenTrait, hash::{HashStateTrait, HashStateExTrait}, num::traits::Zero,
-        traits::TryInto, array::ArrayTrait, serde::Serde,
+        traits::TryInto, array::ArrayTrait,
     };
-    use nftwrapper::StoreU256ArrayTrait::StoreU256Array;
     use super::{
         INFTContractDispatcher, INFTContractDispatcherTrait, INFTWarpedTokenDispatcher,
         INFTWarpedTokenDispatcherTrait,
+    };
+    use starknet::storage::{
+        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map
     };
 
     component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
@@ -80,21 +82,20 @@ mod NFTWrapper {
         accesscontrol: AccessControlComponent::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
-        conversion_rate: LegacyMap::<
+        conversion_rate: Map::<
             ContractAddress, felt252
         >, // NFT contract address -> conversion rate
         wrapped_token_classhash: ClassHash,
-        // nft_pools: LegacyMap::<ContractAddress, Array<u256>>,  // NFT contract address -> Array of NFT token ids
-        nft_pools_value: LegacyMap::<
-            (ContractAddress, u32), u256
-        >, // (NFT contract address, index) -> NFT token ids
-        nft_pools_length: LegacyMap::<
-            ContractAddress, u32
-        >, // NFT contract address -> Array length
-        wrapped_token: LegacyMap::<
+        // nft_pools: Map::<ContractAddress, Array<u256>>,  // NFT contract address -> Array
+        // of NFT token ids
+        // nft_pools_value: Map::<
+        //     (ContractAddress, u32), u256
+        // >, // (NFT contract address, index) -> NFT token ids
+        // nft_pools_length: Map::<ContractAddress, u32>, // NFT contract address -> Array length
+        wrapped_token: Map::<
             ContractAddress, ContractAddress
         >, // NFT contract address -> wrapped token contract address
-        dex_pool: LegacyMap::<
+        dex_pool: Map::<
             ContractAddress, ContractAddress
         >, // NFT contract address -> dex pool contract address
     }
@@ -132,7 +133,7 @@ mod NFTWrapper {
         token_classhash: ClassHash,
         conversion_rate: felt252
     ) -> ContractAddress {
-        assert(self.wrapped_token.read(nft_contract).is_zero(), 'already exist');
+        assert(self.wrapped_token.entry(nft_contract).read().is_zero(), 'already exist');
         assert(self.wrapped_token_classhash.read() == token_classhash, 'invalid classhash');
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
         let nft_name = nft_dispatcher.name();
@@ -151,20 +152,20 @@ mod NFTWrapper {
             token_classhash, salt, constructor_args.span(), false
         )
             .unwrap_syscall();
-        self.wrapped_token.write(nft_contract, wrapped_token_contract_address);
+        self.wrapped_token.entry(nft_contract).write(wrapped_token_contract_address);
         // set conversion rate
-        self.conversion_rate.write(nft_contract, conversion_rate);
+        self.conversion_rate.entry(nft_contract).write(conversion_rate);
         wrapped_token_contract_address
     }
 
     #[external(v0)]
     fn get_conversion_rate(self: @ContractState, nft_contract: ContractAddress) -> felt252 {
-        self.conversion_rate.read(nft_contract)
+        self.conversion_rate.entry(nft_contract).read()
     }
 
     #[external(v0)]
     fn wrap(ref self: ContractState, nft_contract: ContractAddress, nft_token_id: u256) {
-        assert(self.wrapped_token.read(nft_contract).is_non_zero(), 'create first');
+        assert(self.wrapped_token.entry(nft_contract).read().is_non_zero(), 'create first');
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
         // println!("address this: {:?}", get_contract_address());
         // println!("address caller: {:?}", get_caller_address());
@@ -175,61 +176,61 @@ mod NFTWrapper {
         // nft_pool.append(nft_token_id);
         // self.nft_pools.write(nft_contract, nft_pool);
 
-        // cairo native array is not supported yet
-        let nft_pool_length = self.nft_pools_length.read(nft_contract);
-        self.nft_pools_value.write((nft_contract, nft_pool_length), nft_token_id);
-        self.nft_pools_length.write(nft_contract, nft_pool_length + 1);
+        // // cairo native array is not supported yet
+        // let nft_pool_length = self.nft_pools_length.read(nft_contract);
+        // self.nft_pools_value.write((nft_contract, nft_pool_length), nft_token_id);
+        // self.nft_pools_length.write(nft_contract, nft_pool_length + 1);
         let wrapped_token_dispatcher = INFTWarpedTokenDispatcher {
-            contract_address: self.wrapped_token.read(nft_contract)
+            contract_address: self.wrapped_token.entry(nft_contract).read()
         };
         wrapped_token_dispatcher
-            .mint(get_caller_address(), self.conversion_rate.read(nft_contract).into());
+            .mint(get_caller_address(), self.conversion_rate.entry(nft_contract).read().into());
     }
 
-    #[external(v0)]
-    fn get_nft_pool(self: @ContractState, nft_contract: ContractAddress) -> Array<u256> {
-        // self.nft_pools.read(nft_contract)
-        // cairo native array is not supported yet
-        let mut nft_pool: Array<u256> = array![];
-        let nft_pool_length = self.nft_pools_length.read(nft_contract);
-        let mut i = 0;
-        loop {
-            if i == nft_pool_length {
-                break;
-            }
-            nft_pool.append(self.nft_pools_value.read((nft_contract, i)));
-            i += 1;
-        };
-        nft_pool
-    }
+    // #[external(v0)]
+    // fn get_nft_pool(self: @ContractState, nft_contract: ContractAddress) -> Array<u256> {
+    //     // self.nft_pools.read(nft_contract)
+    //     // cairo native array is not supported yet
+    //     let mut nft_pool: Array<u256> = array![];
+    //     let nft_pool_length = self.nft_pools_length.read(nft_contract);
+    //     let mut i = 0;
+    //     loop {
+    //         if i == nft_pool_length {
+    //             break;
+    //         }
+    //         nft_pool.append(self.nft_pools_value.read((nft_contract, i)));
+    //         i += 1;
+    //     };
+    //     nft_pool
+    // }
 
-    fn remove_nft_from_pool(ref self: ContractState, nft_contract: ContractAddress, index: u32) {
-        // // cairo native storage array
-        // let last_index: u32 = self.nft_pools.read(nft_contract).len().into() - 1;
-        // println!("pool length: {:?}", self.nft_pools.read(nft_contract).len());
-        // let nft_pool_before = self.nft_pools.read(nft_contract);
-        // let last_index_value = nft_pool_before.at(last_index);
-        // let mut nft_pool_after: Array<u256> = array![];
-        // let mut i = 0;
-        // loop {
-        //     if i == last_index {
-        //         break;
-        //     }
-        //     if i == index {
-        //         nft_pool_after.append(*last_index_value);
-        //     } else {
-        //         nft_pool_after.append(*nft_pool_before.at(i));
-        //     }
-        //     i += 1;
-        // };
-        // self.nft_pools.write(nft_contract, nft_pool_after);
+    // fn remove_nft_from_pool(ref self: ContractState, nft_contract: ContractAddress, index: u32) {
+    //     // // cairo native storage array
+    //     // let last_index: u32 = self.nft_pools.read(nft_contract).len().into() - 1;
+    //     // println!("pool length: {:?}", self.nft_pools.read(nft_contract).len());
+    //     // let nft_pool_before = self.nft_pools.read(nft_contract);
+    //     // let last_index_value = nft_pool_before.at(last_index);
+    //     // let mut nft_pool_after: Array<u256> = array![];
+    //     // let mut i = 0;
+    //     // loop {
+    //     //     if i == last_index {
+    //     //         break;
+    //     //     }
+    //     //     if i == index {
+    //     //         nft_pool_after.append(*last_index_value);
+    //     //     } else {
+    //     //         nft_pool_after.append(*nft_pool_before.at(i));
+    //     //     }
+    //     //     i += 1;
+    //     // };
+    //     // self.nft_pools.write(nft_contract, nft_pool_after);
 
-        // cairo native array is not supported yet
-        // to decrease gas cost, we just withdraw the last nft to the user
-        // when cairo native storage array is implemented, we will use random index
-        let last_index: u32 = self.nft_pools_length.read(nft_contract) - 1;
-        self.nft_pools_length.write(nft_contract, last_index);
-    }
+    //     // cairo native array is not supported yet
+    //     // to decrease gas cost, we just withdraw the last nft to the user
+    //     // when cairo native storage array is implemented, we will use random index
+    //     let last_index: u32 = self.nft_pools_length.read(nft_contract) - 1;
+    //     self.nft_pools_length.write(nft_contract, last_index);
+    // }
 
     fn random_index(len: u32) -> u32 {
         let random = generate_random_number().try_into().unwrap() % 0xffffffff_u256;
@@ -238,41 +239,42 @@ mod NFTWrapper {
     }
 
     #[external(v0)]
-    fn unwrap(ref self: ContractState, nft_contract: ContractAddress) {
+    fn unwrap(ref self: ContractState, nft_contract: ContractAddress, nft_token_id: u256) {
         // // cairo native storage array
         // assert(self.nft_pools.read(nft_contract).len() > 0, 'empty pool');
         // cairo native array is not supported yet
-        assert(self.nft_pools_length.read(nft_contract) > 0, 'empty pool');
+        // assert(self.nft_pools_length.read(nft_contract) > 0, 'empty pool');
 
         let wrapped_token = INFTWarpedTokenDispatcher {
-            contract_address: self.wrapped_token.read(nft_contract)
+            contract_address: self.wrapped_token.entry(nft_contract).read()
         };
-        wrapped_token.burn(get_caller_address(), self.conversion_rate.read(nft_contract).into());
+        wrapped_token.burn(get_caller_address(), self.conversion_rate.entry(nft_contract).read().into());
         // // cairo native storage array
         // let index = random_index(self.nft_pools.read(nft_contract).len());
         // cairo native array is not supported yet
-        let index = random_index(self.nft_pools_length.read(nft_contract));
+        // let index = random_index(self.nft_pools_length.read(nft_contract));
 
         // println!("index: {:?}", index);
         let nft_dispatcher = INFTContractDispatcher { contract_address: nft_contract };
         // // cairo native storage array
-        // nft_dispatcher.transfer_from(get_contract_address(), get_caller_address(), *self.nft_pools.read(nft_contract).at(index));
+        // nft_dispatcher.transfer_from(get_contract_address(), get_caller_address(),
+        // *self.nft_pools.read(nft_contract).at(index));
         // cairo native array is not supported yet
         nft_dispatcher
             .transfer_from(
                 get_contract_address(),
                 get_caller_address(),
-                self.nft_pools_value.read((nft_contract, index))
+                nft_token_id
             );
-        remove_nft_from_pool(ref self, nft_contract, index);
+        // remove_nft_from_pool(ref self, nft_contract, nft_token_id);
     }
 
     #[external(v0)]
     fn create_dex_pool(
         ref self: ContractState, nft_contract: ContractAddress, dex_classhash: ClassHash, fee: u16
     ) -> ContractAddress {
-        assert(self.dex_pool.read(nft_contract).is_zero(), 'already exist');
-        let wrapped_token_ca = self.wrapped_token.read(nft_contract);
+        assert(self.dex_pool.entry(nft_contract).read().is_zero(), 'already exist');
+        let wrapped_token_ca = self.wrapped_token.entry(nft_contract).read();
         assert(wrapped_token_ca.is_non_zero(), 'create wrapped token first');
         let wrapped_token_dispatcher = INFTWarpedTokenDispatcher {
             contract_address: wrapped_token_ca
@@ -286,7 +288,7 @@ mod NFTWrapper {
             dex_classhash, salt, constructor_args.span(), false
         )
             .unwrap_syscall();
-        self.dex_pool.write(nft_contract, dex_pool_contract_address);
+        self.dex_pool.entry(nft_contract).write(dex_pool_contract_address);
         dex_pool_contract_address
     }
 }

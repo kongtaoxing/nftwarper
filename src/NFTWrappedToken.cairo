@@ -23,7 +23,7 @@ mod NFTWrappedToken {
     use openzeppelin::token::erc20::ERC20Component;
     use openzeppelin::token::erc20::ERC20HooksEmptyImpl;
     use starknet::ContractAddress;
-    use starknet::get_caller_address;
+    // use starknet::get_caller_address;
     use super::{MINTER_ROLE};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);

@@ -1,10 +1,11 @@
 use core::serde::Serde;
 use core::result::ResultTrait;
-use core::num::traits::Zero;
-use core::integer::BoundedInt;
+// use core::num::traits::Zero;
+// use core::integer::BoundedInt;
+use core::num::traits::Bounded;
 use starknet::{
-    ContractAddress, contract_address_const, get_caller_address, get_block_number,
-    get_contract_address
+    ContractAddress, contract_address_const, 
+    // get_caller_address, get_block_number, get_contract_address
 };
 use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
 
@@ -111,8 +112,8 @@ fn test_wrap_nft() {
     );
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 1, 'Wrapped token not minted');
 
-    let nft_pool = wrapper_dispatcher.get_nft_pool(nft_contract_address);
-    assert(nft_pool.len() == 1, 'NFT not added to pool');
+    // let nft_pool = wrapper_dispatcher.get_nft_pool(nft_contract_address);
+    // assert(nft_pool.len() == 1, 'NFT not added to pool');
 }
 
 #[test]
@@ -157,18 +158,18 @@ fn test_unwrap_nft() {
 
     // approve the wrapped token
     start_cheat_caller_address(wrapped_token_ca, caller_address);
-    wrapped_token_dispatcher.approve(wrapper_contract_address, BoundedInt::max());
+    wrapped_token_dispatcher.approve(wrapper_contract_address, Bounded::MAX);
     stop_cheat_caller_address(wrapped_token_ca);
     // unwrap the NFT
     start_cheat_caller_address(wrapper_contract_address, caller_address);
-    wrapper_dispatcher.unwrap(nft_contract_address);
+    wrapper_dispatcher.unwrap(nft_contract_address, token_id);
     stop_cheat_caller_address(wrapper_contract_address);
     assert(nft_contract_dispatcher.owner_of(token_id) == caller_address, 'NFT not unwrapped');
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 0, 'Wrapped token not burned');
-    assert(
-        wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 0,
-        'NFT not removed from pool'
-    );
+    // assert(
+    //     wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 0,
+    //     'NFT not removed from pool'
+    // );
 
     // mint three NFTs
     start_cheat_caller_address(nft_contract_address, caller_address);
@@ -188,13 +189,13 @@ fn test_unwrap_nft() {
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 3, 'Wrapped tokens not minted');
     // remove the first NFT from the pool
     start_cheat_caller_address(wrapper_contract_address, caller_address);
-    wrapper_dispatcher.unwrap(nft_contract_address);
+    wrapper_dispatcher.unwrap(nft_contract_address, token_id2);
     stop_cheat_caller_address(wrapper_contract_address);
     // println!("nft pool: {:?}", wrapper_dispatcher.get_nft_pool(nft_contract_address));
-    assert(
-        wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 2,
-        'NFT not removed from pool'
-    );
+    // assert(
+    //     wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 2,
+    //     'NFT not removed from pool'
+    // );
 }
 
 #[test]
