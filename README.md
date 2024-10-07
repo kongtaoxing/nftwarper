@@ -31,7 +31,7 @@ Then you can see the result.
 
 - [x] Add more tests for access control
 - [x] Create a dex for the wrapped token.
-- [ ] Add more function to the pool.
-- [ ] Add signature verification to `unwrap` function.
+<!-- - [ ] Add more function to the pool. -->
+- [x] Add signature verification to `unwrap` function.
 
 You are welcomed to contribute!

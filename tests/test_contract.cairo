@@ -4,14 +4,16 @@ use core::result::ResultTrait;
 // use core::integer::BoundedInt;
 use core::num::traits::Bounded;
 use starknet::{
-    ContractAddress, contract_address_const, 
-    // get_caller_address, get_block_number, get_contract_address
+    ContractAddress,
+    contract_address_const, // get_caller_address, get_block_number, get_contract_address
 };
 use openzeppelin::access::accesscontrol::DEFAULT_ADMIN_ROLE;
 
 use snforge_std::{
     declare, ContractClass, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-    stop_cheat_caller_address
+    stop_cheat_caller_address,
+    start_cheat_chain_id_global, 
+    stop_cheat_chain_id_global,
 };
 
 use nftwrapper::NFTWrapper::INFTWrapperSafeDispatcher;
@@ -27,7 +29,16 @@ use nftwrapper::NFTWrappedToken::INFTWrappedTokenSafeDispatcherTrait;
 use nftwrapper::dex::IDexDispatcher;
 use nftwrapper::dex::IDexDispatcherTrait;
 
-const PUBLIC_KEY: felt252 = 0x49a1ecb78d4f98eea4c52f2709045d55b05b9c794f7423de504cc1d4f7303c3;
+const SIGNER: felt252 = 0x063C81D15Dd342E8F22a874EE55a59865B04012E5b44098D3f7a8e0F0e0a7640;
+const MESSAGE_HASH: felt252 = 0xae9f26b07112cc2e6d0ef7d3dcdb3774af5cdbd360eff07524ffedcf560f87;
+const SIG_R: felt252 = 2479229890571049757771221125485093698165615065327125975668284125076583573395;
+const SIG_S: felt252 = 2924437662358750303384066777155159318451460232048465929672386149883562254625;
+
+const MESSAGE_HASH2: felt252 = 0x22b75efdfe5aa90224a4a3f1e6205e467a37d5b156c43f62c00ea383ba4519c;
+const SIG_R2: felt252 = 3096176884457270719896988959615693620522280543358448574913427925219174206027;
+const SIG_S2: felt252 = 513552116542419899666536541217298201189204773780395282218396620602724490941;
+
+const PUBLIC_KEY: felt252 = 0x3b1da8fc90ccc7a3e1fa0e37d944e89ed0a7cc4f835b92fd66d1b961f8a281c;
 fn deploy_account(address: ContractAddress) {
     let contract = declare("Account").unwrap().contract_class();
     let args = array![PUBLIC_KEY];
@@ -43,7 +54,11 @@ fn deploy_contract(name: ByteArray) -> ContractAddress {
 fn deploy_wrapper_contract(default_admin: ContractAddress) -> (ContractClass, ContractAddress) {
     let contract = declare("NFTWrapper").unwrap().contract_class();
     let wrapped_token = declare("NFTWrappedToken").unwrap().contract_class();
-    let args: Array<felt252> = array![default_admin.into(), (*wrapped_token.class_hash).into()];
+    let args: Array<felt252> = array![
+        default_admin.into(), 
+        (*wrapped_token.class_hash).into(),
+        SIGNER.into(),
+    ];
     let (contract_address, _) = contract.deploy(@args).unwrap();
     (*wrapped_token, contract_address)
 }
@@ -111,9 +126,8 @@ fn test_wrap_nft() {
         nft_contract_dispatcher.owner_of(token_id) == wrapper_contract_address, 'NFT not wrapped'
     );
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 1, 'Wrapped token not minted');
-
     // let nft_pool = wrapper_dispatcher.get_nft_pool(nft_contract_address);
-    // assert(nft_pool.len() == 1, 'NFT not added to pool');
+// assert(nft_pool.len() == 1, 'NFT not added to pool');
 }
 
 #[test]
@@ -123,6 +137,7 @@ fn test_unwrap_nft() {
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
+    println!("nft contract address: {:?}", nft_contract_address);
     let nft_contract_dispatcher = ITestNFTDispatcher { contract_address: nft_contract_address };
 
     // create wrapped token
@@ -136,6 +151,7 @@ fn test_unwrap_nft() {
 
     let caller_address: ContractAddress = contract_address_const::<'caller_address'>();
     deploy_account(caller_address);
+    deploy_account(contract_address_const::<SIGNER>());
 
     start_cheat_caller_address(nft_contract_address, caller_address);
     // mint a test NFT
@@ -156,13 +172,18 @@ fn test_unwrap_nft() {
     );
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 1, 'Wrapped token not minted');
 
+    start_cheat_chain_id_global('SN_SEPOLIA');
     // approve the wrapped token
     start_cheat_caller_address(wrapped_token_ca, caller_address);
     wrapped_token_dispatcher.approve(wrapper_contract_address, Bounded::MAX);
     stop_cheat_caller_address(wrapped_token_ca);
     // unwrap the NFT
     start_cheat_caller_address(wrapper_contract_address, caller_address);
-    wrapper_dispatcher.unwrap(nft_contract_address, token_id);
+    wrapper_dispatcher.unwrap(
+        nft_contract_address, 
+        token_id, 
+        array![SIG_R.into(), SIG_S.into()]
+    );
     stop_cheat_caller_address(wrapper_contract_address);
     assert(nft_contract_dispatcher.owner_of(token_id) == caller_address, 'NFT not unwrapped');
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 0, 'Wrapped token not burned');
@@ -189,13 +210,14 @@ fn test_unwrap_nft() {
     assert(wrapped_token_dispatcher.balance_of(caller_address) == 3, 'Wrapped tokens not minted');
     // remove the first NFT from the pool
     start_cheat_caller_address(wrapper_contract_address, caller_address);
-    wrapper_dispatcher.unwrap(nft_contract_address, token_id2);
+    wrapper_dispatcher.unwrap(nft_contract_address, token_id2, array![SIG_R2.into(), SIG_S2.into()]);
     stop_cheat_caller_address(wrapper_contract_address);
     // println!("nft pool: {:?}", wrapper_dispatcher.get_nft_pool(nft_contract_address));
     // assert(
     //     wrapper_dispatcher.get_nft_pool(nft_contract_address).len() == 2,
     //     'NFT not removed from pool'
     // );
+    stop_cheat_chain_id_global();
 }
 
 #[test]
