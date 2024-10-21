@@ -137,7 +137,7 @@ fn test_unwrap_nft() {
     let wrapper_dispatcher = INFTWrapperDispatcher { contract_address: wrapper_contract_address };
 
     let nft_contract_address = deploy_contract("TestNFT");
-    println!("nft contract address: {:?}", nft_contract_address);
+    // println!("nft contract address: {:?}", nft_contract_address);
     let nft_contract_dispatcher = ITestNFTDispatcher { contract_address: nft_contract_address };
 
     // create wrapped token

@@ -32,11 +32,9 @@ const main = async ({ token_id }) => {
     },
   };
   
-  const provider = new RpcProvider({ nodeUrl: 'https://free-rpc.nethermind.io/sepolia-juno' });
+  const provider = new RpcProvider({ nodeUrl: process.env.SEPOLIA_NODE_URL });
   const account = new Account(provider, process.env.ADDRESS, process.env.PRIVATE_KEY);
-  console.log('public key:', encode.addHexPrefix(
-    encode.buf2hex(ec.starkCurve.getPublicKey(process.env.PRIVATE_KEY, false))
-  ));
+  console.log('public key:', ec.starkCurve.getStarkKey(process.env.PRIVATE_KEY));
   const signature = (await account.signMessage(typedDataValidate));
   console.log('Sinature:', signature);
 
